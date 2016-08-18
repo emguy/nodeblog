@@ -6,10 +6,19 @@ import cookieParser from 'cookie-parser';
 import bodyParser from 'body-parser';
 import routes from './routes/index';
 import users from './routes/users';
+import session from 'express-session';
+import moment from 'moment';
+import flash from 'connect-flash';
+import multer from 'multer';
+import expressValidator from 'express-validator';
+import expressMessages from 'express-messages';
+import monk from 'monk';
 
 let app = express();
+let db = monk('localhost/nodeblog');
+let upload = multer({ dest: 'uploads/' });
 
-// view engine setup
+/* view engine setup */
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'jade');
 
@@ -20,6 +29,45 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
+
+/* session */
+app.use(session({
+  secret: 'secret',
+  saveUninitialized: true,
+  resave: true
+}));
+
+/* express validator */
+app.use(expressValidator({
+  errorFormatter: function(param, msg, value) {
+    let namespace = param.split('.');
+    let root = namespace.shift();
+    let formParam = root;
+
+    while (namespace.length) {
+      formParam += '[' + namespace.shift() + ']';
+    }
+
+    return {
+      param: formParam,
+      msg: msg,
+      value: value
+    };
+  }
+}));
+
+/* connect-flash */
+app.use(flash());
+app.use((req, res, next) => {
+  res.locals.messages = expressMessages(req, res);
+  next();
+});
+
+/* make our db accesible to our router */
+app.use((req, res, next) => {
+  req.db =db;
+  next();
+});
 
 app.use('/', routes);
 app.use('/users', users);
